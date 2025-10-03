@@ -1,23 +1,25 @@
-# Step 1: Build stage
+# Step 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy project and restore dependencies
+# Copy sln and csproj
 COPY WeaponPaints.sln ./
 COPY WeaponPaints.csproj ./
+
+# Restore dependencies
 RUN dotnet restore WeaponPaints.csproj
 
-# Copy everything
+# Copy the rest of the source
 COPY . .
 
-# Publish as self-contained for Linux x64
-RUN dotnet publish WeaponPaints.csproj -c Release -r linux-x64 --self-contained true -o /app/out
+# Publish as fully self-contained Linux x64 app
+RUN dotnet publish WeaponPaints.csproj -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true /p:PublishTrimmed=true -o /app/out
 
-# Step 2: Runtime stage (just use Debian base image)
-FROM debian:bookworm-slim
+# Step 2: Runtime image
+FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
-# Install dependencies needed for .NET self-contained apps
+# Install any required runtime libs
 RUN apt-get update && apt-get install -y \
     libicu72 \
     libssl3 \
@@ -28,9 +30,10 @@ RUN apt-get update && apt-get install -y \
 # Copy published output
 COPY --from=build /app/out .
 
-# Expose port
+# Make sure binary is executable
+RUN chmod +x ./WeaponPaints
+
+# Expose port (adjust if your app listens elsewhere)
 EXPOSE 10000
-ENV DOTNET_RUNNING_IN_CONTAINER=true
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 ENTRYPOINT ["./WeaponPaints"]
