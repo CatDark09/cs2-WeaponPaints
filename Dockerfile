@@ -1,18 +1,26 @@
-# Use the official .NET SDK image to build
+# Step 1: Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /app
+WORKDIR /src
 
-# Copy everything and restore dependencies
+# Copy solution and project files
+COPY WeaponPaints.sln ./
+COPY WeaponPaints.csproj ./
+
+# Restore dependencies
+RUN dotnet restore WeaponPaints.csproj
+
+# Copy everything else
 COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o out
 
-# Use a smaller runtime image for the actual app
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+# Publish the app
+RUN dotnet publish WeaponPaints.csproj -c Release -o /app/out
+
+# Step 2: Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/out .
 
-# Run on port 10000 (Render default for free services)
+# Render expects the app to listen on port 10000
 ENV ASPNETCORE_URLS=http://+:10000
 EXPOSE 10000
 
